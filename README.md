@@ -2,7 +2,7 @@
 
 Portable, reproducible MSVC Build Tools / Windows SDK package builder for Windows x64.
 
-**Status:** v1.0.0
+**Status:** v1.0.0 · [Repository](https://github.com/arlendotcn/vsbuilder-portable) · [Releases](https://github.com/arlendotcn/vsbuilder-portable/releases)
 
 This builds a portable MSVC + Windows SDK tree from Microsoft Visual Studio
 channel manifests. It downloads and verifies payloads, extracts the toolchain,
