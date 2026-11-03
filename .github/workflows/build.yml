@@ -1,0 +1,26 @@
+name: build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.99.1
+      - name: Build release
+        run: cargo build --release --locked
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vsbuilder-portable-x86_64-pc-windows-msvc
+          path: target/x86_64-pc-windows-msvc/release/vsbuilder.exe
+          if-no-files-found: error
+
