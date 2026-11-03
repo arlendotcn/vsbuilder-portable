@@ -2,7 +2,7 @@
 
 Portable, reproducible MSVC Build Tools / Windows SDK package builder for Windows x64.
 
-**Status:** v1.0.0 · [Repository](https://github.com/arlendotcn/vsbuilder-portable) · [Releases](https://github.com/arlendotcn/vsbuilder-portable/releases)
+**Status:** v1.1.0 · [Repository](https://github.com/arlendotcn/vsbuilder-portable) · [Releases](https://github.com/arlendotcn/vsbuilder-portable/releases)
 
 This builds a portable MSVC + Windows SDK tree from Microsoft Visual Studio
 channel manifests. It downloads and verifies payloads, extracts the toolchain,
@@ -20,7 +20,7 @@ see [Build](#build).
 
 ```text
 vsbuilder list  [--vs 2022|2026|2019] [--preview] [--json]
-vsbuilder build --msvc <version> --sdk <version> --out <empty-dir> --accept-license [--dry-run]
+vsbuilder build [--msvc latest] [--sdk latest] [--out <empty-dir>] [--accept-license] [--dry-run]
 vsbuilder check <dir> [--smoke] [--json]
 ```
 
@@ -41,6 +41,16 @@ package version (`10.0.26100.15`).
 ### build
 
 ```bat
+vsbuilder build
+```
+
+With no options, `build` uses the latest stable MSVC and Windows SDK and writes
+to `<exe-dir>\msvc`. It prompts for the Microsoft Build Tools license when
+stdin is a TTY; non-interactive use requires `--accept-license`.
+
+Explicit selection:
+
+```bat
 vsbuilder build ^
   --msvc 14.44 ^
   --sdk 26100 ^
@@ -48,12 +58,14 @@ vsbuilder build ^
   --accept-license
 ```
 
-- `--out` must be missing or empty; no `--force` is provided.
+- `--msvc` and `--sdk` default to `latest`; `list` shows what that resolves to.
+- `--out` defaults to `<exe-dir>\msvc` and must be missing or empty; no `--force` is provided.
 - The candidate is built in a temporary sibling directory and only renamed to
   `--out` after validation succeeds.
 - `--dry-run` resolves and prints the plan without downloading or writing.
-- `--accept-license` is mandatory for a real build. `list` and `--dry-run` do
-  not require it.
+- Without `--accept-license`, interactive builds prompt for the Microsoft
+  Build Tools license; non-interactive builds require the flag. `list` and
+  `--dry-run` do not require it.
 - Cache is always `<exe-dir>\cache`; the tool remains green/portable and reuses payloads across invocations. The directory must be writable.
 - `--refresh` (global) ignores cached manifests. Manifests are reused for 6 hours by default; a stale manifest is used as fallback if refresh fails.
 - `--proxy` (global) sets an explicit HTTP proxy.
@@ -170,6 +182,7 @@ remain subject to Microsoft's Build Tools license.
 
 VS 2019 and VS 2026 channel URLs are implemented but not yet validated; treat
 them as best-effort.
+
 
 
 

@@ -1,6 +1,7 @@
 use anyhow::{bail, Context, Result};
 use std::collections::HashMap;
 use std::fs;
+use std::io::{self, IsTerminal, Write};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -51,7 +52,9 @@ pub fn build(http: &Http, opts: &BuildOptions) -> Result<()> {
         return Ok(());
     }
     if !opts.accept_license {
-        bail!("license not accepted; pass --accept-license after reviewing {license}");
+        if !confirm_license(&license)? {
+            bail!("license not accepted");
+        }
     }
     package::ensure_empty_output(&opts.out)?;
 
@@ -203,6 +206,20 @@ fn record(p: &Payload) -> PayloadRecord {
         sha256: p.sha256.clone(),
         url: p.url.clone(),
     }
+}
+
+fn confirm_license(license: &str) -> Result<bool> {
+    if !io::stdin().is_terminal() {
+        bail!("license not accepted; pass --accept-license (license: {license})");
+    }
+    print!("Accept the Microsoft Build Tools license at {license}? [y/N] ");
+    io::stdout().flush()?;
+    let mut answer = String::new();
+    io::stdin().read_line(&mut answer)?;
+    Ok(matches!(
+        answer.trim().to_ascii_lowercase().as_str(),
+        "y" | "yes"
+    ))
 }
 
 fn remove_root_install_files(payload: &Path) -> Result<()> {

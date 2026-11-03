@@ -167,10 +167,12 @@ impl Catalog {
     pub fn select_msvc(&self, query: &str) -> Result<SelectedMsvc> {
         let versions = self.msvc_versions();
         let q = query.trim();
+        let latest = q.eq_ignore_ascii_case("latest");
         let found = versions
             .iter()
             .filter(|v| {
-                q == v.minor
+                latest
+                    || q == v.minor
                     || q == v.full
                     || q == v.stem
                     || (q.starts_with(&format!("{}.", v.minor)) && q.split('.').count() == 3)
@@ -193,10 +195,12 @@ impl Catalog {
     pub fn select_sdk(&self, query: &str) -> Result<SelectedSdk> {
         let versions = self.sdk_versions()?;
         let q = query.trim();
+        let latest = q.eq_ignore_ascii_case("latest");
         let found = versions
             .iter()
             .filter(|v| {
-                q == v.short
+                latest
+                    || q == v.short
                     || q == v.package_version
                     || q.starts_with(&format!("10.0.{}.", v.short))
             })

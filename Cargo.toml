@@ -1,6 +1,6 @@
 [package]
 name = "vsbuilder-portable"
-version = "1.0.0"
+version = "1.1.0"
 edition = "2021"
 description = "Portable, reproducible MSVC Build Tools / Windows SDK package builder for Windows x64"
 license = "MIT"
@@ -27,4 +27,5 @@ lto = "thin"
 codegen-units = 1
 strip = true
 panic = "abort"
+
 

@@ -33,6 +33,7 @@ enum Command {
     /// List available MSVC and Windows SDK versions
     List(ListArgs),
     /// Download and build a candidate msvc package
+    #[command(after_help = "Examples:\n  vsbuilder build\n  vsbuilder build --msvc 14.44 --sdk 26100 --out D:\\builds\\msvc --accept-license\n\nWith no options, build uses the latest stable MSVC/SDK and writes to\n<exe-dir>\\msvc. Without --accept-license it prompts when stdin is a TTY;\nnon-interactive use requires --accept-license.")]
     Build(BuildArgs),
     /// Read-only validation of an existing candidate package
     Check(CheckArgs),
@@ -54,24 +55,24 @@ struct ListArgs {
 #[derive(Args)]
 struct BuildArgs {
     /// Visual Studio channel: 2019, 2022 or 2026
-    #[arg(long, default_value = "2022")]
+    #[arg(long, default_value = "2022", value_name = "VERSION")]
     vs: String,
-    /// Use the Preview channel
+    /// Use the Preview channel instead of Release
     #[arg(long)]
     preview: bool,
-    /// MSVC version: minor (14.44), full (14.44.35229) or package stem
-    #[arg(long)]
+    /// MSVC version: latest, minor (14.44), full (14.44.35229), or package stem (14.44.17.14)
+    #[arg(long, default_value = "latest", value_name = "VERSION")]
     msvc: String,
-    /// Windows SDK version: short (26100) or package version
-    #[arg(long)]
+    /// Windows SDK version: latest, short (26100), or package version (10.0.26100.15)
+    #[arg(long, default_value = "latest", value_name = "VERSION")]
     sdk: String,
-    /// Empty output directory for the candidate package
-    #[arg(long)]
-    out: PathBuf,
-    /// Explicitly accept the Microsoft Build Tools license
+    /// Output directory; must be missing or empty (default: <exe-dir>\msvc)
+    #[arg(long, value_name = "DIR")]
+    out: Option<PathBuf>,
+    /// Accept the Microsoft Build Tools license without prompting
     #[arg(long)]
     accept_license: bool,
-    /// Resolve and print the plan without downloading
+    /// Resolve and print the plan without downloading or writing
     #[arg(long)]
     dry_run: bool,
 }
@@ -79,6 +80,7 @@ struct BuildArgs {
 #[derive(Args)]
 struct CheckArgs {
     /// Candidate package directory
+    #[arg(value_name = "DIR")]
     dir: PathBuf,
     /// Run cl.exe /Bv after file checks
     #[arg(long)]
@@ -107,7 +109,7 @@ fn run(cli: Cli) -> Result<()> {
                 preview: args.preview,
                 msvc: args.msvc,
                 sdk: args.sdk,
-                out: args.out,
+                out: args.out.unwrap_or_else(default_output_dir),
                 accept_license: args.accept_license,
                 dry_run: args.dry_run,
             };
@@ -117,12 +119,19 @@ fn run(cli: Cli) -> Result<()> {
     }
 }
 
-fn default_cache_dir() -> PathBuf {
+fn exe_dir() -> PathBuf {
     std::env::current_exe()
         .ok()
         .and_then(|p| p.parent().map(Path::to_path_buf))
         .unwrap_or_else(|| PathBuf::from("."))
-        .join("cache")
+}
+
+fn default_cache_dir() -> PathBuf {
+    exe_dir().join("cache")
+}
+
+fn default_output_dir() -> PathBuf {
+    exe_dir().join("msvc")
 }
 
 fn list(http: &net::Http, args: ListArgs) -> Result<()> {
@@ -202,5 +211,7 @@ fn check(args: CheckArgs) -> Result<()> {
         anyhow::bail!("{} check(s) failed", errors.len())
     }
 }
+
+
 
 
