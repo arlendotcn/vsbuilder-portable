@@ -4,10 +4,31 @@ mod model;
 mod net;
 mod package;
 
-use anyhow::{Context, Result};
-use clap::{Args, Parser, Subcommand};
+use anyhow::{bail, Context, Result};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 use serde_json::json;
 use std::path::{Path, PathBuf};
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
+enum Channel {
+    Stable,
+    Insiders,
+    Lts,
+}
+
+impl Channel {
+    fn slug(self) -> &'static str {
+        match self {
+            Self::Stable => "stable",
+            Self::Insiders => "insiders",
+            Self::Lts => "lts",
+        }
+    }
+
+    fn is_insiders(self) -> bool {
+        self == Self::Insiders
+    }
+}
 
 #[derive(Parser)]
 #[command(
@@ -41,10 +62,13 @@ enum Command {
 
 #[derive(Args)]
 struct ListArgs {
-    /// Visual Studio channel: 2019, 2022 or 2026
+    /// Visual Studio version: 2019, 2022 or 2026
     #[arg(long, default_value = "2022")]
     vs: String,
-    /// Use the Preview channel
+    /// Release channel: stable, insiders, or lts (lts is not available yet)
+    #[arg(long, value_enum, default_value = "stable")]
+    channel: Channel,
+    /// Deprecated alias for --channel insiders
     #[arg(long)]
     preview: bool,
     /// Machine-readable output
@@ -54,10 +78,13 @@ struct ListArgs {
 
 #[derive(Args)]
 struct BuildArgs {
-    /// Visual Studio channel: 2019, 2022 or 2026
+    /// Visual Studio version: 2019, 2022 or 2026
     #[arg(long, default_value = "2022", value_name = "VERSION")]
     vs: String,
-    /// Use the Preview channel instead of Release
+    /// Release channel: stable, insiders, or lts (lts is not available yet)
+    #[arg(long, value_enum, default_value = "stable")]
+    channel: Channel,
+    /// Deprecated alias for --channel insiders
     #[arg(long)]
     preview: bool,
     /// MSVC version: latest, minor (14.44), full (14.44.35229), or package stem (14.44.17.14)
@@ -104,12 +131,13 @@ fn run(cli: Cli) -> Result<()> {
     match cli.command {
         Command::List(args) => list(&http, args),
         Command::Build(args) => {
+            let channel = resolve_channel(args.channel, args.preview)?;
             let out = args
                 .out
-                .unwrap_or_else(|| default_output_dir(&args.vs, args.preview));
+                .unwrap_or_else(|| default_output_dir(&args.vs, channel));
             let opts = build::BuildOptions {
                 vs: args.vs,
-                preview: args.preview,
+                channel,
                 msvc: args.msvc,
                 sdk: args.sdk,
                 out,
@@ -133,29 +161,37 @@ fn default_cache_dir() -> PathBuf {
     exe_dir().join("cache")
 }
 
-fn default_output_dir(vs: &str, preview: bool) -> PathBuf {
-    let name = if preview {
+fn default_output_dir(vs: &str, channel: Channel) -> PathBuf {
+    let name = if channel.is_insiders() {
         format!("msvc-{vs}-preview")
+    } else if channel == Channel::Lts {
+        format!("msvc-{vs}-lts")
     } else {
         format!("msvc-{vs}")
     };
     exe_dir().join(name)
 }
 
+fn resolve_channel(channel: Channel, preview: bool) -> Result<Channel> {
+    if preview {
+        if channel == Channel::Stable {
+            return Ok(Channel::Insiders);
+        }
+        bail!(
+            "--preview conflicts with --channel {}",
+            channel.slug()
+        );
+    }
+    Ok(channel)
+}
+
 fn list(http: &net::Http, args: ListArgs) -> Result<()> {
-    let channel_url = model::channel_url(&args.vs, args.preview)?;
-    let channel_name = format!(
-        "channel-vs{}-{}.json",
-        args.vs,
-        if args.preview { "preview" } else { "release" }
-    );
-    let channel: model::ChannelManifest = http.fetch_json(channel_url, &channel_name)?;
-    let manifest_url = model::manifest_url(&channel, args.preview)?;
-    let vs_name = format!(
-        "vs-{}-{}.json",
-        args.vs,
-        if args.preview { "preview" } else { "release" }
-    );
+    let channel = resolve_channel(args.channel, args.preview)?;
+    let channel_url = model::channel_url(&args.vs, channel.slug())?;
+    let channel_name = format!("channel-vs{}-{}.json", args.vs, channel.slug());
+    let channel_manifest: model::ChannelManifest = http.fetch_json(channel_url, &channel_name)?;
+    let manifest_url = model::manifest_url(&channel_manifest, channel.is_insiders())?;
+    let vs_name = format!("vs-{}-{}.json", args.vs, channel.slug());
     let vsmanifest: model::VsManifest = http.fetch_json(&manifest_url, &vs_name)?;
     let catalog = model::Catalog::new(vsmanifest.packages);
     let msvc = catalog.msvc_versions();
@@ -164,7 +200,7 @@ fn list(http: &net::Http, args: ListArgs) -> Result<()> {
     if args.json {
         let out = json!({
             "vs": args.vs,
-            "channel": if args.preview { "preview" } else { "release" },
+            "channel": channel.slug(),
             "msvc": msvc.iter().map(|v| json!({
                 "minor": v.minor,
                 "version": v.full,
@@ -179,11 +215,11 @@ fn list(http: &net::Http, args: ListArgs) -> Result<()> {
         });
         println!("{}", serde_json::to_string_pretty(&out)?);
     } else {
-        println!("MSVC versions ({}):", if args.preview { "preview" } else { "release" });
+        println!("MSVC versions ({}):", channel.slug());
         for v in &msvc {
             println!("  {:<14} {:>14}  {}", v.minor, v.full, v.stem);
         }
-        println!("Windows SDK versions ({}):", if args.preview { "preview" } else { "release" });
+        println!("Windows SDK versions ({}):", channel.slug());
         for v in &sdk {
             println!("  {:<8} {:>16}  {}", v.short, v.package_version, v.component_id);
         }

@@ -9,10 +9,11 @@ use crate::extract;
 use crate::model::{self, Catalog, ChannelManifest, Payload, VsManifest};
 use crate::net::Http;
 use crate::package::{self, PackageMeta, PayloadRecord};
+use crate::Channel;
 
 pub struct BuildOptions {
     pub vs: String,
-    pub preview: bool,
+    pub channel: Channel,
     pub msvc: String,
     pub sdk: String,
     pub out: PathBuf,
@@ -21,19 +22,11 @@ pub struct BuildOptions {
 }
 
 pub fn build(http: &Http, opts: &BuildOptions) -> Result<()> {
-    let channel_url = model::channel_url(&opts.vs, opts.preview)?;
-    let channel_name = format!(
-        "channel-vs{}-{}.json",
-        opts.vs,
-        if opts.preview { "preview" } else { "release" }
-    );
+    let channel_url = model::channel_url(&opts.vs, opts.channel.slug())?;
+    let channel_name = format!("channel-vs{}-{}.json", opts.vs, opts.channel.slug());
     let channel: ChannelManifest = http.fetch_json(channel_url, &channel_name)?;
-    let manifest_url = model::manifest_url(&channel, opts.preview)?;
-    let vs_name = format!(
-        "vs-{}-{}.json",
-        opts.vs,
-        if opts.preview { "preview" } else { "release" }
-    );
+    let manifest_url = model::manifest_url(&channel, opts.channel.is_insiders())?;
+    let vs_name = format!("vs-{}-{}.json", opts.vs, opts.channel.slug());
     let vsmanifest: VsManifest = http.fetch_json(&manifest_url, &vs_name)?;
     let catalog = Catalog::new(vsmanifest.packages);
     let msvc = catalog.select_msvc(&opts.msvc)?;
@@ -41,7 +34,7 @@ pub fn build(http: &Http, opts: &BuildOptions) -> Result<()> {
     let license = Catalog::license_url(&channel)?;
 
     println!("VS        : {}", opts.vs);
-    println!("Channel   : {}", if opts.preview { "preview" } else { "release" });
+    println!("Channel   : {}", opts.channel.slug());
     println!("MSVC      : {}  ({})", msvc.full, msvc.package_id);
     println!("Windows SDK: {}  ({})", sdk.package_version, sdk.package_id);
     println!("Output    : {}", opts.out.display());
@@ -164,7 +157,7 @@ let file = http.download_payload(p)?;
         .unwrap_or(0);
     let meta = PackageMeta {
         vs: opts.vs.clone(),
-        channel: if opts.preview { "preview".into() } else { "release".into() },
+        channel: opts.channel.slug().to_string(),
         requested_msvc: opts.msvc.clone(),
         requested_sdk: opts.sdk.clone(),
         license: license.clone(),

@@ -300,14 +300,20 @@ pub fn version_cmp(a: &str, b: &str) -> std::cmp::Ordering {
     std::cmp::Ordering::Equal
 }
 
-pub fn channel_url(vs: &str, preview: bool) -> Result<&'static str> {
-    let url = match (vs, preview) {
-        ("2019", false) => "https://aka.ms/vs/16/release/channel",
-        ("2019", true) => "https://aka.ms/vs/16/pre/channel",
-        ("2022", false) => "https://aka.ms/vs/17/release/channel",
-        ("2022", true) => "https://aka.ms/vs/17/pre/channel",
-        ("2026", false) => "https://aka.ms/vs/18/stable/channel",
-        ("2026", true) => "https://aka.ms/vs/18/insiders/channel",
+pub fn channel_url(vs: &str, channel: &str) -> Result<&'static str> {
+    let url = match (vs, channel) {
+        ("2019", "stable") => "https://aka.ms/vs/16/release/channel",
+        ("2019", "insiders") => "https://aka.ms/vs/16/pre/channel",
+        ("2022", "stable") => "https://aka.ms/vs/17/release/channel",
+        ("2022", "insiders") => "https://aka.ms/vs/17/pre/channel",
+        ("2026", "stable") => "https://aka.ms/vs/18/stable/channel",
+        ("2026", "insiders") => "https://aka.ms/vs/18/insiders/channel",
+        (_, "lts") => bail!(
+            "LTS channel is not available yet; use --channel stable or --channel insiders"
+        ),
+        ("2019" | "2022" | "2026", other) => {
+            bail!("unsupported channel '{other}' (use stable, insiders or lts)")
+        }
         _ => bail!("unsupported VS version '{vs}' (use 2019, 2022 or 2026)"),
     };
     Ok(url)
@@ -315,9 +321,9 @@ pub fn channel_url(vs: &str, preview: bool) -> Result<&'static str> {
 
 pub fn manifest_item<'a>(
     channel: &'a ChannelManifest,
-    preview: bool,
+    insiders: bool,
 ) -> Result<&'a ChannelItem> {
-    let id = if preview {
+    let id = if insiders {
         "Microsoft.VisualStudio.Manifests.VisualStudioPreview"
     } else {
         "Microsoft.VisualStudio.Manifests.VisualStudio"
@@ -329,8 +335,8 @@ pub fn manifest_item<'a>(
         .ok_or_else(|| anyhow!("channel manifest {id} not found"))
 }
 
-pub fn manifest_url(channel: &ChannelManifest, preview: bool) -> Result<String> {
-    manifest_item(channel, preview)?
+pub fn manifest_url(channel: &ChannelManifest, insiders: bool) -> Result<String> {
+    manifest_item(channel, insiders)?
         .payloads
         .first()
         .map(|p| p.url.clone())

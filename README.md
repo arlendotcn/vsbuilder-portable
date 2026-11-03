@@ -19,10 +19,25 @@ see [Build](#build).
 ## Commands
 
 ```text
-vsbuilder list  [--vs 2022|2026|2019] [--preview] [--json]
-vsbuilder build [--msvc latest] [--sdk latest] [--out <empty-dir>] [--accept-license] [--dry-run]
+vsbuilder list  [--vs 2022|2026|2019] [--channel stable|insiders|lts] [--json]
+vsbuilder build [--channel stable|insiders|lts] [--msvc latest] [--sdk latest] [--out <empty-dir>] [--accept-license] [--dry-run]
 vsbuilder check <dir> [--smoke] [--json]
 ```
+
+### Channels
+
+`--channel` defaults to `stable`.
+
+| Channel | VS 2019 | VS 2022 | VS 2026 |
+|---|---|---|---|
+| `stable` | `vs/16/release` | `vs/17/release` | `vs/18/stable` |
+| `insiders` | `vs/16/pre` | `vs/17/pre` | `vs/18/insiders` |
+| `lts` | not available | not available | not yet published |
+
+`--preview` is retained as a deprecated alias for `--channel insiders`.
+
+`lts` is accepted as a value but currently returns a clear error: Microsoft has
+not published an LTSC channel URL for the compiler workflow yet.
 
 ### list
 
@@ -181,6 +196,7 @@ remain subject to Microsoft's Build Tools license.
 - VS 2026 release: `list` and `build --dry-run` validated; latest resolves to
   MSVC `14.52.36815` and Windows SDK `10.0.28000.5`
 - VS 2019: not yet validated
+
 
 
 
