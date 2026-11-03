@@ -1,0 +1,175 @@
+# vsbuilder-portable
+
+Portable, reproducible MSVC Build Tools / Windows SDK package builder for Windows x64.
+
+**Status:** v1.0.0
+
+This builds a portable MSVC + Windows SDK tree from Microsoft Visual Studio
+channel manifests. It downloads and verifies payloads, extracts the toolchain,
+generates `pkg.json` / `devcmd.bat` / `devcmd.ps1`, and validates the candidate.
+
+It is **not** an installer and never modifies an active package, PATH, or the
+registry.
+
+## Download
+
+Download the latest `vsbuilder.exe` from GitHub Releases. To build from source,
+see [Build](#build).
+
+## Commands
+
+```text
+vsbuilder list  [--vs 2022|2026|2019] [--preview] [--json]
+vsbuilder build --msvc <version> --sdk <version> --out <empty-dir> --accept-license [--dry-run]
+vsbuilder check <dir> [--smoke] [--json]
+```
+
+### list
+
+```bat
+vsbuilder list
+vsbuilder list --json
+```
+
+MSVC versions are printed as package version / package stem. `build` also
+accepts the minor (`14.44`), the full package version (`14.44.35229`), or the
+package stem (`14.44.17.14`).
+
+The Windows SDK can be selected by short version (`26100`) or the manifest
+package version (`10.0.26100.15`).
+
+### build
+
+```bat
+vsbuilder build ^
+  --msvc 14.44 ^
+  --sdk 26100 ^
+  --out .build\msvc-next ^
+  --accept-license
+```
+
+- `--out` must be missing or empty; no `--force` is provided.
+- The candidate is built in a temporary sibling directory and only renamed to
+  `--out` after validation succeeds.
+- `--dry-run` resolves and prints the plan without downloading or writing.
+- `--accept-license` is mandatory for a real build. `list` and `--dry-run` do
+  not require it.
+- Cache is always `<exe-dir>\cache`; the tool remains green/portable and reuses payloads across invocations. The directory must be writable.
+- `--refresh` (global) ignores cached manifests. Manifests are reused for 6 hours by default; a stale manifest is used as fallback if refresh fails.
+- `--proxy` (global) sets an explicit HTTP proxy.
+
+The selected package version is not necessarily the compiler's actual
+directory version. For example, package `14.44.35229` currently extracts
+`VC\Tools\MSVC\14.44.35207`. The generated `pkg.json` and `BUILD-INFO.json`
+record the actual extracted version.
+
+### check
+
+```bat
+vsbuilder check .build\msvc-next
+vsbuilder check .build\msvc-next --smoke
+vsbuilder check .build\msvc-next --json
+```
+
+`check` is read-only. It validates `pkg.json`, `BUILD-INFO.json`, `cl.exe`,
+SDK paths, `devcmd` files, and the paths referenced by `INCLUDE` / `LIB`.
+`--smoke` additionally runs `cl.exe /Bv`.
+
+## Output
+
+```text
+<out>\
+├─ pkg.json
+├─ BUILD-INFO.json
+└─ payload\
+   ├─ VC\
+   ├─ Windows Kits\
+   ├─ devcmd.bat
+   └─ devcmd.ps1
+```
+
+`BUILD-INFO.json` records the channel, license URL, requested selectors,
+selected package IDs, actual versions, and every downloaded payload's file
+name, URL, and SHA-256.
+
+## Bare Windows
+
+The release binary is linked with the static MSVC CRT:
+
+```toml
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
+```
+
+Verified with `dumpbin /dependents`: no `VCRUNTIME140.dll` or `MSVCP140.dll`.
+Only system DLLs are required. The tool uses `msiexec` for Windows SDK MSI
+extraction; no Python, PowerShell, Visual Studio, or VC++ Redistributable is
+required to run `list`, `build`, or the default `check`.
+
+## Build
+
+From an environment with Rust 1.99.1 and an MSVC toolchain:
+
+```bat
+cargo build --release
+```
+
+Expected output:
+
+```text
+target\x86_64-pc-windows-msvc\release\vsbuilder.exe
+```
+
+## Design boundaries
+
+- `vsbuilder` is a builder, not an installer: it does not modify PATH,
+  registry, or an active package.
+- No implicit `latest`: `build` requires explicit `--msvc` and `--sdk`.
+- No destructive overwrite: the output directory must be empty.
+- No hidden global state: manifests and payloads live under `<exe-dir>\cache`.
+- No GUI and no interactive prompts.
+
+## Trust model
+
+- Channel and BuildTools manifests are fetched over HTTPS.
+- Every downloaded payload is verified against the SHA-256 in the Microsoft
+  manifest; a mismatch fails the build.
+- The manifest itself is authenticated by TLS, not by a separate signature.
+- Windows SDK extraction invokes the Microsoft `msiexec /a` administrative
+  install on the downloaded MSIs.
+- The release binary is not Authenticode-signed. Verify the SHA-256 published
+  with each release.
+- `--proxy` is explicit; system proxy auto-detection is not performed.
+
+## Credits
+
+This is an independent Rust implementation. The channel/package selection
+workflow was informed by these prior-art projects:
+
+- [@mmozeiko / portable-msvc.py](https://gist.github.com/mmozeiko/7f3162ec2988e81e56d5c4e22cde9977)
+- [Data-Oriented-House / PortableBuildTools](https://github.com/Data-Oriented-House/PortableBuildTools)
+
+No source code from either project is included. See
+[THIRD_PARTY.md](THIRD_PARTY.md) for details.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
+
+Downloaded MSVC and Windows SDK payloads are not part of this repository and
+remain subject to Microsoft's Build Tools license.
+
+## Tested
+
+- Windows 11 x64
+- Rust 1.99.1, MSVC target, static CRT
+- VS 2022 release channel
+- MSVC selected `14.44.35229`, extracted `14.44.35207`
+- Windows SDK selected `26100`, extracted `10.0.26100.0`
+- `cl.exe` C++ compile, Rust `rustc` link, `check --smoke`
+
+VS 2019 and VS 2026 channel URLs are implemented but not yet validated; treat
+them as best-effort.
+
+
+
