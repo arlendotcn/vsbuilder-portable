@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -23,4 +23,13 @@ jobs:
           name: vsbuilder-portable-x86_64-pc-windows-msvc
           path: target/x86_64-pc-windows-msvc/release/vsbuilder.exe
           if-no-files-found: error
-
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $exe = "target/x86_64-pc-windows-msvc/release/vsbuilder.exe"
+          $hash = (Get-FileHash $exe -Algorithm SHA256).Hash
+          "$hash  vsbuilder.exe" | Set-Content vsbuilder.exe.sha256 -Encoding ascii
+          gh release create "${{ github.ref_name }}" $exe vsbuilder.exe.sha256 --title "${{ github.ref_name }}" --generate-notes

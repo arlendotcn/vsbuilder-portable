@@ -2,7 +2,7 @@
 
 Portable, reproducible MSVC Build Tools / Windows SDK package builder for Windows x64.
 
-**Status:** v1.1.0 · [Repository](https://github.com/arlendotcn/vsbuilder-portable) · [Releases](https://github.com/arlendotcn/vsbuilder-portable/releases)
+**Status:** v1.0.1 · [Repository](https://github.com/arlendotcn/vsbuilder-portable) · [Releases](https://github.com/arlendotcn/vsbuilder-portable/releases)
 
 This builds a portable MSVC + Windows SDK tree from Microsoft Visual Studio
 channel manifests. It downloads and verifies payloads, extracts the toolchain,
@@ -196,6 +196,7 @@ remain subject to Microsoft's Build Tools license.
 - VS 2026 release: `list` and `build --dry-run` validated; latest resolves to
   MSVC `14.52.36815` and Windows SDK `10.0.28000.5`
 - VS 2019: not yet validated
+
 
 
 
