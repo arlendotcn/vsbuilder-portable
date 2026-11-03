@@ -306,8 +306,8 @@ pub fn channel_url(vs: &str, preview: bool) -> Result<&'static str> {
         ("2019", true) => "https://aka.ms/vs/16/pre/channel",
         ("2022", false) => "https://aka.ms/vs/17/release/channel",
         ("2022", true) => "https://aka.ms/vs/17/pre/channel",
-        ("2026", false) => "https://aka.ms/vs/18/release/channel",
-        ("2026", true) => "https://aka.ms/vs/18/pre/channel",
+        ("2026", false) => "https://aka.ms/vs/18/stable/channel",
+        ("2026", true) => "https://aka.ms/vs/18/insiders/channel",
         _ => bail!("unsupported VS version '{vs}' (use 2019, 2022 or 2026)"),
     };
     Ok(url)

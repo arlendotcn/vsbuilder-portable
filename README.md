@@ -45,7 +45,7 @@ vsbuilder build
 ```
 
 With no options, `build` uses the latest stable MSVC and Windows SDK and writes
-to `<exe-dir>\msvc`. It prompts for the Microsoft Build Tools license when
+to `<exe-dir>\msvc-2022`. It prompts for the Microsoft Build Tools license when
 stdin is a TTY; non-interactive use requires `--accept-license`.
 
 Explicit selection:
@@ -59,7 +59,7 @@ vsbuilder build ^
 ```
 
 - `--msvc` and `--sdk` default to `latest`; `list` shows what that resolves to.
-- `--out` defaults to `<exe-dir>\msvc` and must be missing or empty; no `--force` is provided.
+- `--out` defaults to `<exe-dir>\msvc-<vs>` (for example `msvc-2022`) and must be missing or empty; no `--force` is provided.
 - The candidate is built in a temporary sibling directory and only renamed to
   `--out` after validation succeeds.
 - `--dry-run` resolves and prints the plan without downloading or writing.
@@ -175,13 +175,12 @@ remain subject to Microsoft's Build Tools license.
 
 - Windows 11 x64
 - Rust 1.99.1, MSVC target, static CRT
-- VS 2022 release channel
-- MSVC selected `14.44.35229`, extracted `14.44.35207`
-- Windows SDK selected `26100`, extracted `10.0.26100.0`
-- `cl.exe` C++ compile, Rust `rustc` link, `check --smoke`
-
-VS 2019 and VS 2026 channel URLs are implemented but not yet validated; treat
-them as best-effort.
+- VS 2022 release: full build and `check --smoke`
+- VS 2022: MSVC selected `14.44.35229`, extracted `14.44.35207`
+- VS 2022: Windows SDK selected `26100`, extracted `10.0.26100.0`
+- VS 2026 release: `list` and `build --dry-run` validated; latest resolves to
+  MSVC `14.52.36815` and Windows SDK `10.0.28000.5`
+- VS 2019: not yet validated
 
 
 

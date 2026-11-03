@@ -33,7 +33,7 @@ enum Command {
     /// List available MSVC and Windows SDK versions
     List(ListArgs),
     /// Download and build a candidate msvc package
-    #[command(after_help = "Examples:\n  vsbuilder build\n  vsbuilder build --msvc 14.44 --sdk 26100 --out D:\\builds\\msvc --accept-license\n\nWith no options, build uses the latest stable MSVC/SDK and writes to\n<exe-dir>\\msvc. Without --accept-license it prompts when stdin is a TTY;\nnon-interactive use requires --accept-license.")]
+    #[command(after_help = "Examples:\n  vsbuilder build\n  vsbuilder build --msvc 14.44 --sdk 26100 --out D:\\builds\\msvc --accept-license\n\nWith no options, build uses the latest stable MSVC/SDK and writes to\n<exe-dir>\\msvc-<vs> (for example <exe-dir>\\msvc-2022). Without\n--accept-license it prompts when stdin is a TTY; non-interactive use requires\n--accept-license.")]
     Build(BuildArgs),
     /// Read-only validation of an existing candidate package
     Check(CheckArgs),
@@ -66,7 +66,7 @@ struct BuildArgs {
     /// Windows SDK version: latest, short (26100), or package version (10.0.26100.15)
     #[arg(long, default_value = "latest", value_name = "VERSION")]
     sdk: String,
-    /// Output directory; must be missing or empty (default: <exe-dir>\msvc)
+    /// Output directory; must be missing or empty (default: <exe-dir>\msvc-<vs>)
     #[arg(long, value_name = "DIR")]
     out: Option<PathBuf>,
     /// Accept the Microsoft Build Tools license without prompting
@@ -104,12 +104,15 @@ fn run(cli: Cli) -> Result<()> {
     match cli.command {
         Command::List(args) => list(&http, args),
         Command::Build(args) => {
+            let out = args
+                .out
+                .unwrap_or_else(|| default_output_dir(&args.vs, args.preview));
             let opts = build::BuildOptions {
                 vs: args.vs,
                 preview: args.preview,
                 msvc: args.msvc,
                 sdk: args.sdk,
-                out: args.out.unwrap_or_else(default_output_dir),
+                out,
                 accept_license: args.accept_license,
                 dry_run: args.dry_run,
             };
@@ -130,8 +133,13 @@ fn default_cache_dir() -> PathBuf {
     exe_dir().join("cache")
 }
 
-fn default_output_dir() -> PathBuf {
-    exe_dir().join("msvc")
+fn default_output_dir(vs: &str, preview: bool) -> PathBuf {
+    let name = if preview {
+        format!("msvc-{vs}-preview")
+    } else {
+        format!("msvc-{vs}")
+    };
+    exe_dir().join(name)
 }
 
 fn list(http: &net::Http, args: ListArgs) -> Result<()> {

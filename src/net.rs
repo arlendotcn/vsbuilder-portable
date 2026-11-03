@@ -57,24 +57,32 @@ impl Http {
             .unwrap_or(false);
         if !self.refresh && fresh {
             if let Some(bytes) = &cached {
-                return crate::model::parse_json(bytes, cache_name);
+                match crate::model::parse_json(bytes, cache_name) {
+                    Ok(value) => return Ok(value),
+                    Err(_) => {
+                        eprintln!("warning: cached manifest {cache_name} is invalid; refreshing");
+                    }
+                }
             }
         }
         match self.get_bytes(url, None) {
             Ok(bytes) => {
+                let parsed = crate::model::parse_json(&bytes, cache_name)?;
                 if let Some(parent) = path.parent() {
                     fs::create_dir_all(parent)?;
                 }
                 let tmp = path.with_extension("tmp");
                 fs::write(&tmp, &bytes)?;
                 fs::rename(&tmp, &path)?;
-                crate::model::parse_json(&bytes, cache_name)
+                Ok(parsed)
             }
             Err(err) => {
                 if !self.refresh {
                     if let Some(bytes) = &cached {
-                        eprintln!("warning: manifest refresh failed; using cached {cache_name}: {err:#}");
-                        return crate::model::parse_json(bytes, cache_name);
+                        if let Ok(value) = crate::model::parse_json(bytes, cache_name) {
+                            eprintln!("warning: manifest refresh failed; using cached {cache_name}: {err:#}");
+                            return Ok(value);
+                        }
                     }
                 }
                 Err(err)
