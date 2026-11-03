@@ -54,7 +54,7 @@ enum Command {
     /// List available MSVC and Windows SDK versions
     List(ListArgs),
     /// Download and build a candidate msvc package
-    #[command(after_help = "Examples:\n  vsbuilder build\n  vsbuilder build --msvc 14.44 --sdk 26100 --out D:\\builds\\msvc --accept-license\n\nWith no options, build uses the latest stable MSVC/SDK and writes to\n<exe-dir>\\msvc-<vs> (for example <exe-dir>\\msvc-2022). Without\n--accept-license it prompts when stdin is a TTY; non-interactive use requires\n--accept-license.")]
+    #[command(after_help = "Examples:\n  vsbuilder build\n  vsbuilder build --msvc 14.44 --sdk 26100 --out D:\\builds\\msvc --accept-license\n\nWith no options, build uses the latest stable MSVC/SDK and writes to\n<exe-dir>\\msvc-<vs>-<msvc>-sdk<sdk> (resolved versions). Without\n--accept-license it prompts when stdin is a TTY; non-interactive use requires\n--accept-license.")]
     Build(BuildArgs),
     /// Read-only validation of an existing candidate package
     Check(CheckArgs),
@@ -93,7 +93,7 @@ struct BuildArgs {
     /// Windows SDK version: latest, short (26100), or package version (10.0.26100.15)
     #[arg(long, default_value = "latest", value_name = "VERSION")]
     sdk: String,
-    /// Output directory; must be missing or empty (default: <exe-dir>\msvc-<vs>)
+    /// Output directory; must be missing or empty (default: <exe-dir>\msvc-<vs>-<msvc>-sdk<sdk>)
     #[arg(long, value_name = "DIR")]
     out: Option<PathBuf>,
     /// Accept the Microsoft Build Tools license without prompting
@@ -132,15 +132,12 @@ fn run(cli: Cli) -> Result<()> {
         Command::List(args) => list(&http, args),
         Command::Build(args) => {
             let channel = resolve_channel(args.channel, args.preview)?;
-            let out = args
-                .out
-                .unwrap_or_else(|| default_output_dir(&args.vs, channel));
             let opts = build::BuildOptions {
                 vs: args.vs,
                 channel,
                 msvc: args.msvc,
                 sdk: args.sdk,
-                out,
+                out: args.out,
                 accept_license: args.accept_license,
                 dry_run: args.dry_run,
             };
@@ -161,14 +158,16 @@ fn default_cache_dir() -> PathBuf {
     exe_dir().join("cache")
 }
 
-fn default_output_dir(vs: &str, channel: Channel) -> PathBuf {
-    let name = if channel.is_insiders() {
-        format!("msvc-{vs}-preview")
-    } else if channel == Channel::Lts {
-        format!("msvc-{vs}-lts")
-    } else {
-        format!("msvc-{vs}")
-    };
+pub(crate) fn default_output_dir(
+    vs: &str,
+    channel: Channel,
+    msvc_version: &str,
+    sdk_version: &str,
+) -> PathBuf {
+    let mut name = format!("msvc-{vs}-{msvc_version}-sdk{sdk_version}");
+    if channel.is_insiders() {
+        name.push_str("-preview");
+    }
     exe_dir().join(name)
 }
 
@@ -255,6 +254,7 @@ fn check(args: CheckArgs) -> Result<()> {
         anyhow::bail!("{} check(s) failed", errors.len())
     }
 }
+
 
 
 

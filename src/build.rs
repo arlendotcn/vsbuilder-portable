@@ -16,7 +16,7 @@ pub struct BuildOptions {
     pub channel: Channel,
     pub msvc: String,
     pub sdk: String,
-    pub out: PathBuf,
+    pub out: Option<PathBuf>,
     pub accept_license: bool,
     pub dry_run: bool,
 }
@@ -32,12 +32,20 @@ pub fn build(http: &Http, opts: &BuildOptions) -> Result<()> {
     let msvc = catalog.select_msvc(&opts.msvc)?;
     let sdk = catalog.select_sdk(&opts.sdk)?;
     let license = Catalog::license_url(&channel)?;
+    let out = opts.out.clone().unwrap_or_else(|| {
+        crate::default_output_dir(
+            &opts.vs,
+            opts.channel,
+            &msvc.full,
+            &sdk.package_version,
+        )
+    });
 
     println!("VS        : {}", opts.vs);
     println!("Channel   : {}", opts.channel.slug());
     println!("MSVC      : {}  ({})", msvc.full, msvc.package_id);
     println!("Windows SDK: {}  ({})", sdk.package_version, sdk.package_id);
-    println!("Output    : {}", opts.out.display());
+    println!("Output    : {}", out.display());
     println!("License   : {license}");
 
     if opts.dry_run {
@@ -49,9 +57,9 @@ pub fn build(http: &Http, opts: &BuildOptions) -> Result<()> {
             bail!("license not accepted");
         }
     }
-    package::ensure_empty_output(&opts.out)?;
+    package::ensure_empty_output(&out)?;
 
-    let parent = opts.out.parent().unwrap_or_else(|| Path::new("."));
+    let parent = out.parent().unwrap_or_else(|| Path::new("."));
     fs::create_dir_all(parent)?;
     let temp = tempfile::Builder::new()
         .prefix(".vsbuilder-")
@@ -181,15 +189,15 @@ let file = http.download_payload(p)?;
         bail!("candidate package failed validation");
     }
 
-    if opts.out.exists() {
-        fs::remove_dir(&opts.out)
-            .with_context(|| format!("removing empty {}", opts.out.display()))?;
+    if out.exists() {
+        fs::remove_dir(&out)
+            .with_context(|| format!("removing empty {}", out.display()))?;
     }
     let root_path = root.clone();
     let _ = temp.keep();
-    fs::rename(&root_path, &opts.out)
-        .with_context(|| format!("moving candidate to {}", opts.out.display()))?;
-    println!("Built {} (MSVC {}, SDK {})", opts.out.display(), meta.msvc_version, meta.sdk_version);
+    fs::rename(&root_path, &out)
+        .with_context(|| format!("moving candidate to {}", out.display()))?;
+    println!("Built {} (MSVC {}, SDK {})", out.display(), meta.msvc_version, meta.sdk_version);
     Ok(())
 }
 

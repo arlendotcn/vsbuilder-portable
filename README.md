@@ -2,7 +2,7 @@
 
 Portable, reproducible MSVC Build Tools / Windows SDK package builder for Windows x64.
 
-**Status:** v1.0.1 · [Repository](https://github.com/arlendotcn/vsbuilder-portable) · [Releases](https://github.com/arlendotcn/vsbuilder-portable/releases)
+**Status:** v1.0.2 · [Repository](https://github.com/arlendotcn/vsbuilder-portable) · [Releases](https://github.com/arlendotcn/vsbuilder-portable/releases)
 
 This builds a portable MSVC + Windows SDK tree from Microsoft Visual Studio
 channel manifests. It downloads and verifies payloads, extracts the toolchain,
@@ -60,7 +60,7 @@ vsbuilder build
 ```
 
 With no options, `build` uses the latest stable MSVC and Windows SDK and writes
-to `<exe-dir>\msvc-2022`. It prompts for the Microsoft Build Tools license when
+to `<exe-dir>\msvc-2022-<msvc>-sdk<sdk>` using the resolved versions. It prompts for the Microsoft Build Tools license when
 stdin is a TTY; non-interactive use requires `--accept-license`.
 
 Explicit selection:
@@ -74,7 +74,7 @@ vsbuilder build ^
 ```
 
 - `--msvc` and `--sdk` default to `latest`; `list` shows what that resolves to.
-- `--out` defaults to `<exe-dir>\msvc-<vs>` (for example `msvc-2022`) and must be missing or empty; no `--force` is provided.
+- `--out` defaults to `<exe-dir>\msvc-<vs>-<msvc>-sdk<sdk>` (for example `msvc-2022-14.44.35229-sdk10.0.26100.15`) and must be missing or empty; no `--force` is provided.
 - The candidate is built in a temporary sibling directory and only renamed to
   `--out` after validation succeeds.
 - `--dry-run` resolves and prints the plan without downloading or writing.
@@ -196,6 +196,7 @@ remain subject to Microsoft's Build Tools license.
 - VS 2026 release: `list` and `build --dry-run` validated; latest resolves to
   MSVC `14.52.36815` and Windows SDK `10.0.28000.5`
 - VS 2019: not yet validated
+
 
 
 
