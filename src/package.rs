@@ -4,6 +4,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+const ARPKG_PS1: &str = include_str!("../engine/arpkg.ps1");
+const ARPKG_CMD: &str = include_str!("../engine/arpkg.cmd");
+const ARPKG_VERSION: &str = "1.0.0";
+
 #[derive(Debug, Clone)]
 pub struct PayloadRecord {
     pub file_name: String,
@@ -68,6 +72,16 @@ pub fn write_package(out: &Path, meta: &PackageMeta) -> Result<()> {
         serde_json::to_vec_pretty(&pkg).context("serializing pkg.json")?,
     )?;
 
+    write_devcmd(out, &meta.msvc_version, &meta.sdk_version)?;
+    fs::write(out.join("arpkg.ps1"), ARPKG_PS1.as_bytes())?;
+    fs::write(out.join("arpkg.cmd"), ARPKG_CMD.as_bytes())?;
+
+    let payload_tree = crate::hash::hash_tree(&out.join("payload"))?;
+    fs::write(
+        out.join("PAYLOAD-MANIFEST.tsv"),
+        payload_tree.manifest_tsv(),
+    )?;
+
     let info = json!({
         "tool": "vsbuilder",
         "toolVersion": env!("CARGO_PKG_VERSION"),
@@ -89,6 +103,17 @@ pub fn write_package(out: &Path, meta: &PackageMeta) -> Result<()> {
             "component": meta.sdk_component,
             "package": meta.sdk_package
         },
+        "payloadTree": {
+            "sha256": payload_tree.sha256,
+            "fileCount": payload_tree.file_count,
+            "bytes": payload_tree.total_bytes
+        },
+        "engine": {
+            "name": "arpkg",
+            "version": ARPKG_VERSION,
+            "ps1Sha256": crate::hash::sha256_bytes(ARPKG_PS1.as_bytes()),
+            "cmdSha256": crate::hash::sha256_bytes(ARPKG_CMD.as_bytes())
+        },
         "payloads": meta.payloads.iter().map(|p| json!({
             "fileName": p.file_name,
             "sha256": p.sha256,
@@ -100,8 +125,6 @@ pub fn write_package(out: &Path, meta: &PackageMeta) -> Result<()> {
         out.join("BUILD-INFO.json"),
         serde_json::to_vec_pretty(&info).context("serializing BUILD-INFO.json")?,
     )?;
-
-    write_devcmd(out, &meta.msvc_version, &meta.sdk_version)?;
     Ok(())
 }
 
@@ -177,6 +200,16 @@ pub fn check(dir: &Path, smoke: bool) -> Result<Vec<String>> {
             errors.push(format!("missing {}", p.display()));
         }
     }
+    for f in ["arpkg.cmd", "arpkg.ps1"] {
+        let p = dir.join(f);
+        if !p.exists() {
+            errors.push(format!("missing {}", p.display()));
+        }
+    }
+    let manifest_path = dir.join("PAYLOAD-MANIFEST.tsv");
+    if !manifest_path.exists() {
+        errors.push("missing PAYLOAD-MANIFEST.tsv".to_string());
+    }
     let info_path = dir.join("BUILD-INFO.json");
     if !info_path.exists() {
         errors.push("missing BUILD-INFO.json".to_string());
@@ -186,6 +219,62 @@ pub fn check(dir: &Path, smoke: bool) -> Result<Vec<String>> {
     {
         if info.get("msvc").and_then(|v| v.get("version")).and_then(Value::as_str) != Some(version.as_str()) {
             errors.push("BUILD-INFO msvc.version does not match pkg.json".to_string());
+        }
+        match info
+            .get("payloadTree")
+            .and_then(|v| v.get("sha256"))
+            .and_then(Value::as_str)
+        {
+            Some(expected) => match crate::hash::hash_tree(&payload) {
+                Ok(tree) => {
+                    if tree.sha256 != expected {
+                        errors.push(format!(
+                            "payload tree hash mismatch: BUILD-INFO {}, actual {}",
+                            expected, tree.sha256
+                        ));
+                    }
+                    if let Some(expected_count) = info
+                        .get("payloadTree")
+                        .and_then(|v| v.get("fileCount"))
+                        .and_then(Value::as_u64)
+                    {
+                        if tree.file_count != expected_count {
+                            errors.push(format!(
+                                "payload file count mismatch: BUILD-INFO {}, actual {}",
+                                expected_count, tree.file_count
+                            ));
+                        }
+                    }
+                }
+                Err(err) => errors.push(format!("hashing payload: {err:#}")),
+            },
+            None => errors.push("BUILD-INFO payloadTree.sha256 missing".to_string()),
+        }
+        for (field, file) in [("ps1Sha256", "arpkg.ps1"), ("cmdSha256", "arpkg.cmd")] {
+            let expected = info
+                .get("engine")
+                .and_then(|v| v.get(field))
+                .and_then(Value::as_str);
+            match expected {
+                Some(expected) => {
+                    let path = dir.join(file);
+                    match fs::read(&path) {
+                        Ok(bytes) => {
+                            let actual = crate::hash::sha256_bytes(&bytes);
+                            if actual != expected {
+                                errors.push(format!(
+                                    "{file} hash mismatch: BUILD-INFO {}, actual {}",
+                                    expected, actual
+                                ));
+                            }
+                        }
+                        Err(err) => {
+                            errors.push(format!("reading {}: {err}", path.display()));
+                        }
+                    }
+                }
+                None => errors.push(format!("BUILD-INFO engine.{field} missing")),
+            }
         }
     } else {
         errors.push("invalid BUILD-INFO.json".to_string());

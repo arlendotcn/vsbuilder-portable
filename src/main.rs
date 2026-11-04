@@ -1,5 +1,6 @@
 mod build;
 mod extract;
+mod hash;
 mod model;
 mod net;
 mod package;
@@ -254,6 +255,7 @@ fn check(args: CheckArgs) -> Result<()> {
         anyhow::bail!("{} check(s) failed", errors.len())
     }
 }
+
 
 
 

@@ -144,6 +144,7 @@ let file = http.download_payload(p)?;
     }
     merge_program_files(&payload)?;
     remove_root_install_files(&payload)?;
+    extract::remove_if_exists(&sdk_dir)?;
 
     let sdk_version = package::sdk_version_from_payload(&payload)
         .context("determining extracted Windows SDK version")?;

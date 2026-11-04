@@ -2,11 +2,11 @@
 
 Portable, reproducible MSVC Build Tools / Windows SDK package builder for Windows x64.
 
-**Status:** v1.0.2 · [Repository](https://github.com/arlendotcn/vsbuilder-portable) · [Releases](https://github.com/arlendotcn/vsbuilder-portable/releases)
+**Status:** v1.0.3 · [Repository](https://github.com/arlendotcn/vsbuilder-portable) · [Releases](https://github.com/arlendotcn/vsbuilder-portable/releases)
 
 This builds a portable MSVC + Windows SDK tree from Microsoft Visual Studio
 channel manifests. It downloads and verifies payloads, extracts the toolchain,
-generates `pkg.json` / `devcmd.bat` / `devcmd.ps1`, and validates the candidate.
+generates `pkg.json` / `devcmd.bat` / `devcmd.ps1` / `arpkg`, and validates the candidate.
 
 It is **not** an installer and never modifies an active package, PATH, or the
 registry.
@@ -99,7 +99,8 @@ vsbuilder check .build\msvc-next --json
 ```
 
 `check` is read-only. It validates `pkg.json`, `BUILD-INFO.json`, `cl.exe`,
-SDK paths, `devcmd` files, and the paths referenced by `INCLUDE` / `LIB`.
+SDK paths, `devcmd` files, the `arpkg` engine files, `PAYLOAD-MANIFEST.tsv`,
+the payload tree SHA-256, and the paths referenced by `INCLUDE` / `LIB`.
 `--smoke` additionally runs `cl.exe /Bv`.
 
 ## Output
@@ -108,6 +109,9 @@ SDK paths, `devcmd` files, and the paths referenced by `INCLUDE` / `LIB`.
 <out>\
 ├─ pkg.json
 ├─ BUILD-INFO.json
+├─ PAYLOAD-MANIFEST.tsv
+├─ arpkg.cmd
+├─ arpkg.ps1
 └─ payload\
    ├─ VC\
    ├─ Windows Kits\
@@ -116,8 +120,17 @@ SDK paths, `devcmd` files, and the paths referenced by `INCLUDE` / `LIB`.
 ```
 
 `BUILD-INFO.json` records the channel, license URL, requested selectors,
-selected package IDs, actual versions, and every downloaded payload's file
-name, URL, and SHA-256.
+selected package IDs, actual versions, every downloaded payload's file name,
+URL and SHA-256, the `arpkg` engine hashes, and the final payload tree SHA-256.
+
+`PAYLOAD-MANIFEST.tsv` lists every payload file as:
+
+```text
+<sha256>	<size>	<relative-path>
+```
+
+The candidate is a complete package layout: `arpkg.cmd` / `arpkg.ps1` support
+standalone `status`, `doctor`, `register` and `unregister`.
 
 ## Bare Windows
 
@@ -190,12 +203,16 @@ remain subject to Microsoft's Build Tools license.
 
 - Windows 11 x64
 - Rust 1.99.1, MSVC target, static CRT
-- VS 2022 release: full build and `check --smoke`
+- VS 2022 release: full build, payload tree hash, `check`, `check --smoke`
 - VS 2022: MSVC selected `14.44.35229`, extracted `14.44.35207`
 - VS 2022: Windows SDK selected `26100`, extracted `10.0.26100.0`
+- Candidate package: `arpkg status`, `doctor`, `register --user` and
+  `unregister --user` validated
 - VS 2026 release: `list` and `build --dry-run` validated; latest resolves to
   MSVC `14.52.36815` and Windows SDK `10.0.28000.5`
 - VS 2019: not yet validated
+
+
 
 
 
